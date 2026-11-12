@@ -32,7 +32,7 @@ jobs:
       - name: Generate version header
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '1.0.212-revived.0' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and $env:GITHUB_EVENT_PATH -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.1\]')) { '1.0.212-revived.1' } else { '1.0.212-revived.0' }
           python GenerateVersionHeader.py "$version" | Out-File -FilePath NppSaveAsAdmin/src/plugin/SaveAsAdminVersion.hpp -Encoding ascii
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile plugin and helper
@@ -45,7 +45,7 @@ jobs:
       - name: Package release ZIP
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { 'dev' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.1\]')) { '1.0.212-revived.1' } else { 'dev' }
           $sourceDir = "NppSaveAsAdmin/${{ matrix.output_dir }}"
           $dest = 'package'
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -68,7 +68,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[release v1.0.212-revived.1]'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -88,5 +88,7 @@ jobs:
           files=(dist/*.zip)
           if [ "${#files[@]}" -ne 2 ]; then echo 'Expected x86 and x64 ZIPs'; exit 1; fi
           flags=()
-          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then flags+=(--prerelease); fi
-          gh release create "${GITHUB_REF_NAME}" "${files[@]}" --title "NppSaveAsAdmin Revived ${GITHUB_REF_NAME}" --generate-notes --verify-tag "${flags[@]}"
+          if [[ "${GITHUB_REF_NAME}" == *-* || "${GITHUB_REF_TYPE}" != "tag" ]]; then flags+=(--prerelease); fi
+          version="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then version="v1.0.212-revived.1"; flags+=(--target "${GITHUB_SHA}"); else flags+=(--verify-tag); fi
+          gh release create "${version}" "${files[@]}" --title "NppSaveAsAdmin Revived ${version}" --generate-notes "${flags[@]}"
