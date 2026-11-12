@@ -98,9 +98,10 @@ bool setCommand(size_t index,
 
 std::string make_about_text() {
   std::stringstream info;
-  info << "Notepad++ SaveAsAdmin plugin" << std::endl;
+  info << "Notepad++ SaveAsAdmin Revived plugin" << std::endl;
   info << "Version: " << SAVE_AS_ADMIN_VERSION << std::endl;
-  info << "Author: Khnykin Yauheni" << std::endl;
+  info << "Original author: Khnykin Yauheni" << std::endl;
+  info << "Revived fork maintainer: ALeX400" << std::endl;
 
   if (is_admin_app_exists()) {
     info << std::endl
@@ -118,7 +119,9 @@ std::string make_about_text() {
   info << std::endl
        << "Plugin sources: https://github.com/Hsilgos/nppsaveasadmin"
        << std::endl;
-  info << "Issue reports: https://github.com/Hsilgos/nppsaveasadmin/issues"
+  info << "Revived fork: https://github.com/ALeX400/nppSaveAsAdmin-Revived"
+       << std::endl;
+  info << "Issue reports: https://github.com/ALeX400/nppSaveAsAdmin-Revived/issues"
        << std::endl;
   return info.str();
 }
