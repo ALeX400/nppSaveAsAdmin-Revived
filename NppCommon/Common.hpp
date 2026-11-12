@@ -24,6 +24,7 @@ enum Commands : std::uint8_t {
   CloseHandleCmd,
   GetFileTypeCmd,
   ExitCmd,
+  FlushFileBuffersCmd,
 
   MaxCmd
 };
@@ -72,6 +73,16 @@ struct CloseHandleData {
 };
 
 struct CloseHandleResult {
+  bool success;
+  DWORD last_error;
+};
+
+// FlushFileBuffers
+struct FlushFileBuffersData {
+  HANDLE handle;
+};
+
+struct FlushFileBuffersResult {
   bool success;
   DWORD last_error;
 };
