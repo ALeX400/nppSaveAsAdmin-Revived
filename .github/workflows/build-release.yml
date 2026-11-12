@@ -1,0 +1,92 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86
+            platform: Win32
+            output_dir: bin
+          - arch: x64
+            platform: x64
+            output_dir: bin64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      - name: Generate version header
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '1.0.212-revived.0' }
+          python GenerateVersionHeader.py "$version" | Out-File -FilePath NppSaveAsAdmin/src/plugin/SaveAsAdminVersion.hpp -Encoding ascii
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compile plugin and helper
+        shell: pwsh
+        run: |
+          msbuild NppSaveAsAdmin/vs.proj/NppPluginTemplate.vcxproj /m /p:Configuration=Release /p:Platform=${{ matrix.platform }} /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msbuild NppAdminAccess/NppAdminAccess.vcxproj /m /p:Configuration=Release /p:Platform=${{ matrix.platform }} /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package release ZIP
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { 'dev' }
+          $sourceDir = "NppSaveAsAdmin/${{ matrix.output_dir }}"
+          $dest = 'package'
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          foreach ($name in @('NppSaveAsAdmin.dll','NppAdminAccess.exe')) {
+            $path = Join-Path $sourceDir $name
+            if (-not (Test-Path $path)) { throw "Required file missing: $path" }
+            Copy-Item $path $dest
+          }
+          Copy-Item NppSaveAsAdmin/license.txt $dest
+          Copy-Item README.md $dest
+          $zip = "NppSaveAsAdmin_${version}_${{ matrix.arch }}.zip"
+          Compress-Archive -Path package/* -DestinationPath $zip -CompressionLevel Optimal
+          "ZIP_PATH=$zip" >> $env:GITHUB_ENV
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nppsaveasadmin-${{ matrix.arch }}
+          path: ${{ env.ZIP_PATH }}
+          if-no-files-found: error
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download built ZIPs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: nppsaveasadmin-*
+          merge-multiple: true
+          path: dist
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          files=(dist/*.zip)
+          if [ "${#files[@]}" -ne 2 ]; then echo 'Expected x86 and x64 ZIPs'; exit 1; fi
+          flags=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "${GITHUB_REF_NAME}" "${files[@]}" --title "NppSaveAsAdmin Revived ${GITHUB_REF_NAME}" --generate-notes --verify-tag "${flags[@]}"
