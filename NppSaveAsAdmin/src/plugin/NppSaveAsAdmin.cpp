@@ -10,6 +10,7 @@
 
 extern FuncItem funcItem[nbFunc];
 extern NppData nppData;
+extern HINSTANCE module_handle;
 
 namespace {
 std::wstring g_admin_app_path;
