@@ -1,0 +1,84 @@
+name: Signed commit (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Existing branch to update (not main)"
+        required: true
+        type: string
+      file_path:
+        description: "Repository-relative file path"
+        required: true
+        type: string
+      content_base64:
+        description: "UTF-8 file content encoded as base64 (do not put secrets here)"
+        required: true
+        type: string
+      commit_message:
+        description: "Commit message"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  signed-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check signing key exists
+        env:
+          SIGNING_KEY: ${{ secrets.COMMIT_SIGNING_SSH_KEY }}
+        run: |
+          if [[ -z "$SIGNING_KEY" ]]; then
+            echo "::error::Missing COMMIT_SIGNING_SSH_KEY repository secret."
+            exit 1
+          fi
+      - name: Validate inputs
+        env:
+          TARGET_BRANCH: ${{ inputs.branch }}
+          FILE_PATH: ${{ inputs.file_path }}
+        run: |
+          if [[ "$TARGET_BRANCH" == "main" || "$TARGET_BRANCH" == "master" || "$TARGET_BRANCH" == refs/* || "$TARGET_BRANCH" == -* ]]; then
+            echo "::error::Use an existing feature branch, not main."
+            exit 1
+          fi
+          if [[ ! "$FILE_PATH" =~ ^[a-zA-Z0-9_.-]+(/[a-zA-Z0-9_.-]+)*$ || "$FILE_PATH" == *..* || "$FILE_PATH" == .github/workflows/* ]]; then
+            echo "::error::Invalid or restricted file path."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Create SSH-signed commit
+        env:
+          SIGNING_KEY: ${{ secrets.COMMIT_SIGNING_SSH_KEY }}
+          FILE_PATH: ${{ inputs.file_path }}
+          FILE_CONTENT_BASE64: ${{ inputs.content_base64 }}
+          COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          keyfile="$(mktemp)"
+          trap 'rm -f "$keyfile"' EXIT
+          printf '%s\n' "$SIGNING_KEY" > "$keyfile"
+          chmod 600 "$keyfile"
+          ssh-keygen -y -f "$keyfile" > /dev/null
+          git config user.name "ALeX400"
+          git config user.email "10267988+ALeX400@users.noreply.github.com"
+          git config gpg.format ssh
+          git config user.signingkey "$keyfile"
+          git config commit.gpgsign true
+          mkdir -p "$(dirname "$FILE_PATH")"
+          printf '%s' "$FILE_CONTENT_BASE64" | base64 --decode > "$FILE_PATH"
+          git add -- "$FILE_PATH"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "$COMMIT_MESSAGE"
+          git push origin HEAD
