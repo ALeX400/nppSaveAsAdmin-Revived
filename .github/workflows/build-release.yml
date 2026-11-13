@@ -103,15 +103,3 @@ jobs:
           fi
 
 
-  cleanup_signing_test:
-    name: Remove completed signing test branch
-    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[cleanup signing test]')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Delete test branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: gh api -X DELETE "repos/${GH_REPO}/git/refs/heads/test/ssh-signed-commit"
