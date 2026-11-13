@@ -15,6 +15,10 @@ Find the x86 or x64 ZIP matching your **Notepad++ architecture** under [Releases
 
 Extract the contents to `<Notepad++ installation>/plugins/NppSaveAsAdmin/`. Keep the DLL and elevated helper executable in the **same directory**, then restart Notepad++. This matches the current manual plugin installation layout documented by Notepad++.
 
+## Notepad++ Plugin Admin listing
+
+Notepad++ Plugin Admin uses the independent [nppPluginList](https://github.com/notepad-plus-plus/nppPluginList) catalog. Its current `Save as admin` entry points to the upstream Hsilgos v1.0.211 ZIP and reports that version. Updating the DLL version resource or this repository does **not** update the Plugin Admin catalog. Install the Revived ZIP manually until a separate upstream catalog change is accepted. Do not use Plugin Admin's older package to update the Revived build.
+
 ## Builds and releases
 
 The [Build and Release workflow](.github/workflows/build-release.yml) runs MSBuild on Windows using Visual Studio 2022, compiles Win32/x86 and x64 configurations, and uploads ZIP artifacts for CI. Pushing a tag such as `v1.0.212-revived.1` creates a GitHub Release containing both ready-to-extract ZIPs if both builds pass. Tags with a prerelease suffix publish prereleases.
