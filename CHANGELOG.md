@@ -6,7 +6,9 @@ All changes to NppSaveAsAdmin Revived are documented here.
 
 - Fixed an invalid-handle error during protected-file saves by forwarding `FlushFileBuffers` to the elevated helper.
 - Added a matching Win32 API abstraction and IPC command for flushing elevated file handles.
-- **Pending:** x86/x64 CI build and runtime retest on Windows.
+- x86/x64 CI builds passed; protected-file save was reported working in manual Windows testing.
+- Updated DLL version-resource product metadata to identify the Revived fork.
+- Note: Notepad++ Plugins Admin displays metadata from its external plugin catalog, not solely from DLL version resources.
 
 - Modernized the Visual Studio C++ projects to the VS2022 v143 toolset and Windows 10 SDK.
 - Added x86 and x64 GitHub Actions compilation, ZIP packaging and tag-based GitHub Releases.
