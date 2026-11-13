@@ -24,6 +24,7 @@
     <ClCompile Include="CommandProcessor.cpp" />
     <ClCompile Include="CreateFileWCommand.cpp" />
     <ClCompile Include="GetFileTypeCommand.cpp" />
+    <ClCompile Include="FlushFileBuffersCommand.cpp" />
     <ClCompile Include="ICommand.cpp" />
     <ClCompile Include="WriteFileCommand.cpp" />
   </ItemGroup>
@@ -33,6 +34,7 @@
     <ClInclude Include="CommandProcessor.hpp" />
     <ClInclude Include="CreateFileWCommand.hpp" />
     <ClInclude Include="GetFileTypeCommand.hpp" />
+    <ClInclude Include="FlushFileBuffersCommand.hpp" />
     <ClInclude Include="ICommand.hpp" />
     <ClInclude Include="WriteFileCommand.hpp" />
   </ItemGroup>

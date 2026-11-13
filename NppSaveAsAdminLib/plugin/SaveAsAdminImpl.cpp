@@ -27,6 +27,9 @@ class SaveAsAdminImpl::Impl {
     m_close_handle = inject_in_module(
         nullptr, CloseHandle,
         make_injection_callback(*this, &Impl::close_handle_hook));
+    m_flush_file_buffers = inject_in_module(
+        nullptr, FlushFileBuffers,
+        make_injection_callback(*this, &Impl::flush_file_buffers_hook));
   }
 
   void allow_process_file() { m_is_process_allowed = true; }
@@ -113,6 +116,16 @@ class SaveAsAdminImpl::Impl {
     }
   }
 
+  BOOL flush_file_buffers_hook(HANDLE handle) {
+    HandleMap::iterator it = m_file_handles.find(handle);
+    if (it != m_file_handles.end()) {
+      return execute_flush_file_buffers(*it->second->pipe_sender,
+                                        *it->second->pipe_receiver,
+                                        it->second->origin_handle);
+    }
+    return m_flush_file_buffers->call_original(handle);
+  }
+
   DWORD get_file_type_hook(HANDLE handle) {
     HandleMap::iterator it = m_file_handles.find(handle);
     if (it != m_file_handles.end())
@@ -141,6 +154,7 @@ class SaveAsAdminImpl::Impl {
   injection_ptr_type(CreateFileW) m_create_filew;
   injection_ptr_type(GetFileType) m_get_file_type;
   injection_ptr_type(CloseHandle) m_close_handle;
+  injection_ptr_type(FlushFileBuffers) m_flush_file_buffers;
 };
 
 namespace {

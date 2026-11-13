@@ -99,6 +99,21 @@ BOOL execute_write_file(Pipe& pipe_sender,
   return TRUE;
 }
 
+BOOL execute_flush_file_buffers(Pipe& pipe_sender,
+                                Pipe& pipe_receiver,
+                                HANDLE handle) {
+  FlushFileBuffersData request = {0};
+  request.handle = handle;
+  FlushFileBuffersResult result = {0};
+  if (!execute_function(pipe_sender, pipe_receiver, request,
+                        FlushFileBuffersCmd, result)) {
+    SetLastError(ERROR_BROKEN_PIPE);
+    return FALSE;
+  }
+  SetLastError(result.last_error);
+  return result.success ? TRUE : FALSE;
+}
+
 DWORD execute_get_file_type(Pipe& pipe_sender,
                             Pipe& pipe_receiver,
                             HANDLE handle) {

@@ -18,6 +18,10 @@ BOOL execute_write_file(Pipe& pipe_sender,
                         LPCVOID buffer,
                         DWORD number_of_bytes_to_write,
                         LPDWORD number_of_bytes_written);
+BOOL execute_flush_file_buffers(Pipe& pipe_sender,
+                                Pipe& pipe_receiver,
+                                HANDLE handle);
+
 DWORD execute_get_file_type(Pipe& pipe_sender,
                             Pipe& pipe_receiver,
                             HANDLE handle);
