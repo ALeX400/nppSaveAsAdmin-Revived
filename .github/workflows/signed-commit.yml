@@ -1,22 +1,14 @@
-name: Signed commit (manual)
+name: Prepare SSH-signed changes
 
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: "Existing branch to update (not main)"
-        required: true
-        type: string
-      file_path:
-        description: "Repository-relative file path"
-        required: true
-        type: string
-      content_base64:
-        description: "UTF-8 file content encoded as base64 (do not put secrets here)"
+      source_branch:
+        description: "Existing branch containing the changes to sign (not main)"
         required: true
         type: string
       commit_message:
-        description: "Commit message"
+        description: "Message for the new signed commit"
         required: true
         type: string
 
@@ -24,61 +16,74 @@ permissions:
   contents: write
 
 jobs:
-  signed-commit:
+  sign-changes:
     runs-on: ubuntu-latest
     steps:
-      - name: Check signing key exists
+      - name: Validate source branch
         env:
-          SIGNING_KEY: ${{ secrets.COMMIT_SIGNING_SSH_KEY }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
         run: |
-          if [[ -z "$SIGNING_KEY" ]]; then
-            echo "::error::Missing COMMIT_SIGNING_SSH_KEY repository secret."
+          set -euo pipefail
+          if [[ ! "$SOURCE_BRANCH" =~ ^[a-zA-Z0-9][a-zA-Z0-9._/-]*$ ||
+                "$SOURCE_BRANCH" == "main" || "$SOURCE_BRANCH" == "master" ||
+                "$SOURCE_BRANCH" == *..* || "$SOURCE_BRANCH" == */ ||
+                "$SOURCE_BRANCH" == *//*
+              ]]; then
+            echo "::error::Enter an existing feature branch, not main."
             exit 1
           fi
-      - name: Validate inputs
-        env:
-          TARGET_BRANCH: ${{ inputs.branch }}
-          FILE_PATH: ${{ inputs.file_path }}
-        run: |
-          if [[ "$TARGET_BRANCH" == "main" || "$TARGET_BRANCH" == "master" || "$TARGET_BRANCH" == refs/* || "$TARGET_BRANCH" == -* ]]; then
-            echo "::error::Use an existing feature branch, not main."
-            exit 1
-          fi
-          if [[ ! "$FILE_PATH" =~ ^[a-zA-Z0-9_.-]+(/[a-zA-Z0-9_.-]+)*$ || "$FILE_PATH" == *..* || "$FILE_PATH" == .github/workflows/* ]]; then
-            echo "::error::Invalid or restricted file path."
-            exit 1
-          fi
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch }}
+          ref: main
+          fetch-depth: 0
           persist-credentials: true
-          fetch-depth: 1
-      - name: Create SSH-signed commit
+
+      - name: Create signed branch from changes
         env:
-          SIGNING_KEY: ${{ secrets.COMMIT_SIGNING_SSH_KEY }}
-          FILE_PATH: ${{ inputs.file_path }}
-          FILE_CONTENT_BASE64: ${{ inputs.content_base64 }}
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
           COMMIT_MESSAGE: ${{ inputs.commit_message }}
+          SIGNING_KEY: ${{ secrets.COMMIT_SIGNING_SSH_KEY }}
+          RUN_ID: ${{ github.run_id }}
         shell: bash
         run: |
           set -euo pipefail
+          if [[ -z "$SIGNING_KEY" ]]; then
+            echo "::error::COMMIT_SIGNING_SSH_KEY secret is missing."
+            exit 1
+          fi
           umask 077
           keyfile="$(mktemp)"
-          trap 'rm -f "$keyfile"' EXIT
+          patchfile="$(mktemp)"
+          trap 'rm -f "$keyfile" "$patchfile"' EXIT
           printf '%s\n' "$SIGNING_KEY" > "$keyfile"
           chmod 600 "$keyfile"
           ssh-keygen -y -f "$keyfile" > /dev/null
+
+          git fetch origin "refs/heads/$SOURCE_BRANCH:refs/remotes/origin/source-to-sign"
+          git diff --binary origin/main...refs/remotes/origin/source-to-sign > "$patchfile"
+          if [[ ! -s "$patchfile" ]]; then
+            echo "::error::Source branch has no changes relative to main."
+            exit 1
+          fi
+
+          signed_branch="signed/run-$RUN_ID"
+          git switch -c "$signed_branch" origin/main
+          git apply --index "$patchfile"
           git config user.name "ALeX400"
           git config user.email "10267988+ALeX400@users.noreply.github.com"
           git config gpg.format ssh
           git config user.signingkey "$keyfile"
           git config commit.gpgsign true
-          mkdir -p "$(dirname "$FILE_PATH")"
-          printf '%s' "$FILE_CONTENT_BASE64" | base64 --decode > "$FILE_PATH"
-          git add -- "$FILE_PATH"
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
           git commit -m "$COMMIT_MESSAGE"
-          git push origin HEAD
+          git push origin "HEAD:refs/heads/$signed_branch"
+
+          {
+            echo "### Signed branch created"
+            echo "Branch: \`$signed_branch\`"
+            echo ""
+            echo "Open a pull request from this branch into main:"
+            echo "https://github.com/$GITHUB_REPOSITORY/compare/main...$signed_branch?expand=1"
+            echo ""
+            echo "Source branch remains unchanged. Delete it after the PR is merged."
+          } >> "$GITHUB_STEP_SUMMARY"
