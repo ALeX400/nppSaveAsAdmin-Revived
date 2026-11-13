@@ -32,7 +32,7 @@ jobs:
       - name: Generate version header
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and $env:GITHUB_EVENT_PATH -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.2\]')) { '1.0.212-revived.1' } else { '1.0.212-revived.0' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and $env:GITHUB_EVENT_PATH -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.2\]')) { '1.0.212-revived.2' } else { '1.0.212-revived.0' }
           python GenerateVersionHeader.py "$version" | Out-File -FilePath NppSaveAsAdmin/src/plugin/SaveAsAdminVersion.hpp -Encoding ascii
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Compile plugin and helper
@@ -45,7 +45,7 @@ jobs:
       - name: Package release ZIP
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.2\]')) { '1.0.212-revived.1' } else { 'dev' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } elseif ($env:GITHUB_REF_NAME -eq 'main' -and ((Get-Content $env:GITHUB_EVENT_PATH -Raw) -match '\[release v1\.0\.212-revived\.2\]')) { '1.0.212-revived.2' } else { 'dev' }
           $sourceDir = "NppSaveAsAdmin/${{ matrix.output_dir }}"
           $dest = 'package'
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -91,4 +91,13 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" && "${GITHUB_REF_NAME}" == *-* ]]; then flags+=(--prerelease); fi
           version="${GITHUB_REF_NAME}"
           if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then version="v1.0.212-revived.2"; flags+=(--target "${GITHUB_SHA}"); else flags+=(--verify-tag); fi
-          gh release create "${version}" "${files[@]}" --title "NppSaveAsAdmin Revived ${version}" --generate-notes "${flags[@]}" --latest
+          if gh release view "${version}" >/dev/null 2>&1; then
+            # Remove stale assets from an earlier build of this tag.
+            gh api "repos/${GH_REPO}/releases/tags/${version}" --jq '.assets[].id' | while read -r asset_id; do
+              gh api -X DELETE "repos/${GH_REPO}/releases/assets/${asset_id}"
+            done
+            gh release upload "${version}" "${files[@]}" --clobber
+            gh release edit "${version}" --prerelease=false --latest
+          else
+            gh release create "${version}" "${files[@]}" --title "NppSaveAsAdmin Revived ${version}" --generate-notes "${flags[@]}" --latest
+          fi
