@@ -46,7 +46,7 @@ BEGIN
 			VALUE	"FileDescription",	"NppSaveAsAdmin Revived for Notepad++\0"
 			VALUE	"FileVersion", SAVE_AS_ADMIN_VERSION
 			VALUE	"InternalName",	"NppSaveAsAdmin.dll\0"
-			VALUE	"LegalCopyright",	"Copyright 2018 by Yauheni Khnykin\0"
+			VALUE	"LegalCopyright",	"Original copyright 2018 Yauheni Khnykin\0"
 			VALUE	"OriginalFilename",	"NppSaveAsAdmin.dll\0"
 			VALUE	"ProductName",	"NppSaveAsAdmin Revived\0"
 			VALUE	"ProductVersion", SAVE_AS_ADMIN_VERSION
